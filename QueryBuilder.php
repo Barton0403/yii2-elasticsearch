@@ -462,7 +462,33 @@ class QueryBuilder extends BaseObject
 
     private function buildLikeCondition($operator, $operands)
     {
-        throw new NotSupportedException('like conditions are not supported by Elasticsearch.');
+        if (!is_array($operands[1])) {
+            $values = [$operands[1]];
+        } else {
+            $values = $operands[1];
+        }
+
+        $escape = ['*'];
+        if (isset($operands[2])) {
+            $escape = $operands[2];
+        }
+
+        $filters = [];
+        foreach ($values as $value) {
+            $value = empty($escape) ? $value : ('*' . strtr($value, $escape) . '*');
+            $filters[] = [
+                'wildcard' => [ $operands[0] => $value ]
+            ];
+        }
+
+        switch ($operator) {
+            case 'like':
+                return count($filters) > 1 ? ['bool' => ['must' => $filters]] : $filters[0];
+            case 'not like':
+                return ['bool' => ['must_not' => $filters]];
+            default:
+                throw new InvalidArgumentException("Operator '$operator' is not implemented.");
+        }
     }
 
     private function buildMatchCondition($operator, $operands)
